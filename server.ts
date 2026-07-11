@@ -20,17 +20,23 @@ async function startServer() {
     try {
       const { fullName, specialty, level, phone, email } = req.body;
 
-      const clientEmail = process.env.MEDSPEAK_GOOGLE_CLIENT_EMAIL;
-      const privateKey = process.env.MEDSPEAK_GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-      const spreadsheetId = process.env.MEDSPEAK_SPREADSHEET_ID;
+      const clientEmail = (process.env.MEDSPEAK_GOOGLE_CLIENT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL)?.trim();
+      const rawPrivateKey = (process.env.MEDSPEAK_GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY)?.trim();
+      const privateKey = rawPrivateKey?.replace(/\\n/g, '\n');
+      const spreadsheetId = (process.env.MEDSPEAK_SPREADSHEET_ID || process.env.SPREADSHEET_ID)?.trim();
 
       // If credentials are not set, we can either mock success or fail.
-      // Failing with a 500 error will trigger the frontend error handling.
       if (!clientEmail || !privateKey || !spreadsheetId) {
-        console.warn('Google Sheets credentials are not configured in Environment Variables. Registration will be simulated.');
-        // For preview purposes, if the owner hasn't set up the keys yet, we simulate success
-        // so the frontend still works for the end user.
+        console.warn('Google Sheets credentials are not configured. Registration will be simulated.');
         return res.status(200).json({ success: true, simulated: true });
+      }
+
+      if (!privateKey.includes('END PRIVATE KEY')) {
+        console.error('Google Private Key appears to be truncated or malformed.');
+        return res.status(500).json({ 
+          error: 'Configuration Error', 
+          details: 'The GOOGLE_PRIVATE_KEY is truncated. Please make sure to copy the entire key including the "-----END PRIVATE KEY-----" line.' 
+        });
       }
 
       // Initialize Google Auth
